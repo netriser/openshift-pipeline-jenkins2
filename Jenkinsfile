@@ -2,7 +2,7 @@ pipeline {
     agent any
     parameters {
         string(name: 'PROJECT_NAME', defaultValue: 'mon-projet', description: 'Nom du projet OpenShift')
-        string(name: 'IMAGE_TAG', defaultValue: 'v1.0.0', description: 'Version de tag de l\'image (ne doit pas être "latest")')
+        string(name: 'IMAGE_TAG', defaultValue: 'v1.0.0', description: 'Version de tag de l\'image')
     }
     environment {
         OPENSHIFT_API_URL = 'https://api.crc.testing:6443'
@@ -52,13 +52,13 @@ pipeline {
         stage('Build Image') {
             steps {
                 script {
-                    if (params.IMAGE_TAG == 'latest') {
-                        error "Image tag cannot be 'latest'. Please provide a specific version for IMAGE_TAG."
-                    }
                     withEnv(["PATH+OC=${tool 'oc3.11'}", "KUBECONFIG=${env.WORKSPACE}/kubeconfig"]) {
                         sh """
-                        echo 'Starting OpenShift build in project ${OPENSHIFT_PROJECT} with tag ${IMAGE_TAG}...'
+                        echo 'Starting OpenShift build in project ${OPENSHIFT_PROJECT}...'
                         oc start-build html-nginx-build --from-dir=. --follow
+
+                        echo 'Tagging image with ${IMAGE_TAG}...'
+                        oc tag ${OPENSHIFT_PROJECT}/html-nginx-build:latest ${OPENSHIFT_PROJECT}/html-nginx-build:${IMAGE_TAG}
                         """
                     }
                 }
@@ -71,13 +71,13 @@ pipeline {
                         sh """
                         echo 'Deploying application in project ${OPENSHIFT_PROJECT}...'
                         oc project ${OPENSHIFT_PROJECT}
-                        if oc get dc html-nginx; then
+                        if oc get dc html-nginx > /dev/null 2>&1; then
                             echo 'DeploymentConfig exists, rolling out...'
-                            oc set image dc/html-nginx html-nginx=html-nginx:${IMAGE_TAG}
+                            oc set image dc/html-nginx html-nginx=${OPENSHIFT_PROJECT}/html-nginx-build:${IMAGE_TAG}
                             oc rollout status dc/html-nginx
                         else
                             echo 'Creating new application with tag ${IMAGE_TAG}...'
-                            oc new-app html-nginx-build:${IMAGE_TAG}
+                            oc new-app ${OPENSHIFT_PROJECT}/html-nginx-build:${IMAGE_TAG}
                         fi
                         """
                     }

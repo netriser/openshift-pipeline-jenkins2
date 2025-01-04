@@ -2,7 +2,7 @@ pipeline {
     agent any
     parameters {
         string(name: 'PROJECT_NAME', defaultValue: 'mon-projet', description: 'Nom du projet OpenShift')
-        string(name: 'IMAGE_TAG', defaultValue: 'v1.0', description: 'Version de tag de l\'image (ne doit pas être "latest")')
+        string(name: 'IMAGE_TAG', defaultValue: 'v1.0.0', description: 'Version de tag de l\'image (ne doit pas être "latest")')
     }
     environment {
         OPENSHIFT_API_URL = 'https://api.crc.testing:6443'
@@ -32,6 +32,23 @@ pipeline {
                 }
             }
         }
+        stage('Create BuildConfig') {
+            steps {
+                script {
+                    withEnv(["PATH+OC=${tool 'oc3.11'}", "KUBECONFIG=${env.WORKSPACE}/kubeconfig"]) {
+                        sh """
+                        echo 'Checking if BuildConfig exists...'
+                        if ! oc get bc html-nginx-build > /dev/null 2>&1; then
+                            echo 'BuildConfig does not exist. Creating BuildConfig...'
+                            oc new-build --name=html-nginx-build --binary --strategy=source --image-stream=nginx:alpine
+                        else
+                            echo 'BuildConfig already exists.'
+                        fi
+                        """
+                    }
+                }
+            }
+        }
         stage('Build Image') {
             steps {
                 script {
@@ -41,7 +58,7 @@ pipeline {
                     withEnv(["PATH+OC=${tool 'oc3.11'}", "KUBECONFIG=${env.WORKSPACE}/kubeconfig"]) {
                         sh """
                         echo 'Starting OpenShift build in project ${OPENSHIFT_PROJECT} with tag ${IMAGE_TAG}...'
-                        oc start-build html-nginx-build --from-dir=. --follow --build-arg=IMAGE_TAG=${IMAGE_TAG}
+                        oc start-build html-nginx-build --from-dir=. --follow
                         """
                     }
                 }

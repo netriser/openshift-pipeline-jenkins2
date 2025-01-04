@@ -40,7 +40,7 @@ pipeline {
                         echo 'Checking if BuildConfig exists...'
                         if ! oc get bc html-nginx-build > /dev/null 2>&1; then
                             echo 'BuildConfig does not exist. Creating BuildConfig...'
-                            oc new-build --name=html-nginx-build --binary --strategy=source --image-stream=nginx:alpine
+                            oc new-build --name=html-nginx-build --binary --strategy=source --image-stream="openshift/nginx:latest"
                         else
                             echo 'BuildConfig already exists.'
                         fi
